@@ -14,6 +14,7 @@ class Task {
     );
   }
 
+  //to get values from prefs and decode it to json from map
   factory Task.fromMap(Map<String,dynamic> map) {
     return Task(
       task: map['task'],

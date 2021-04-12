@@ -13,12 +13,35 @@ class Example2 extends StatefulWidget {
 
 class _Example2State extends State<Example2> {
   var _taskController;
+  List<Task> list;
+  List<bool> _taskDone;
 
   @override
   void initState() {
     // TODO: implement initState
     super.initState();
     _taskController=TextEditingController();
+    getPrefs();
+     getTaskList();
+  }
+  void getPrefs() async {
+    SharedPreferences prefs=await SharedPreferences.getInstance();
+  }
+
+  void getTaskList() async{
+    list=[];
+    SharedPreferences prefs=await SharedPreferences.getInstance();
+    String task=prefs.getString('task');
+    List listTask=(task ==null)? [] : json.decode(task);
+    print(listTask);
+    for(dynamic d in listTask) {
+      //we have encoded the data 2 times when we saved the data
+      //so we have to decode the data when we retrieve the data
+      list.add(Task.fromMap(json.decode(d)));
+    }
+
+    _taskDone=List.generate(list.length, (index) => false);
+    setState(() {});
   }
 
   @override
@@ -28,18 +51,37 @@ class _Example2State extends State<Example2> {
   }
 
   void _saveData() async {
-    SharedPreferences prefs= await SharedPreferences.getInstance();
     Task t=Task.fromTask(_taskController.text);
+    SharedPreferences prefs=await SharedPreferences.getInstance();
     String task=prefs.getString('task');
+    print('1' + task);
     List list=(task == null) ? [] : json.decode(task);
+    print('2 '+list.toString());
     //adding a new task to the existing list
     list.add(json.encode(t.getMap()));
     //saving new list to prefs
     prefs.setString('task', json.encode(list));
     _taskController.text='';
-    print(json.encode(list));
+    print('3 '+json.encode(list));
     //close the bottom sheet
     Navigator.of(context).pop();
+    getTaskList();
+  }
+  void _clearCompletedTask() async{
+    if(list != null) {
+      SharedPreferences pref=await SharedPreferences.getInstance();
+      List<Task> pendingList=[];
+      for(var i=0;i<list.length;i++)
+        if(!_taskDone[i]) pendingList.add(list[i]);
+
+      var pendingListEncoded=List.generate(
+        //pendingList[index]  -> instance of class
+        //pendingList[index].getMap() -> return Map data
+        //json.encode(//...)  -> encode to json
+          pendingList.length, (index) => json.encode(pendingList[index].getMap()));
+      pref.setString('task', json.encode(pendingListEncoded));
+      getTaskList();
+    }
   }
 
   @override
@@ -50,13 +92,56 @@ class _Example2State extends State<Example2> {
         'Task Manager',
         style: GoogleFonts.montserrat(),
       ),
+        actions: [
+          IconButton(icon: Icon(Icons.save), onPressed: () => _clearCompletedTask()),
+          IconButton(icon: Icon(Icons.delete), onPressed: () async{
+            SharedPreferences pref=await SharedPreferences.getInstance();
+            pref.setString('task', json.encode([]));
+            getTaskList();
+          })
+        ],
       ),
-      body: Center(
+      body: (list == null || list == []) ? Center(
         child: Container(
           child: Text('No actions added yet',
           style: GoogleFonts.montserrat(),
           ),
     ),
+      ) : SingleChildScrollView(
+        child: Column(
+          children: list.map((e) {
+            return Container(
+              width: MediaQuery.of(context).size.width,
+              margin: const EdgeInsets.symmetric(
+                horizontal: 10.0,
+                vertical: 5.0
+              ),
+              padding : const EdgeInsets.all(10.0),
+              alignment: Alignment.centerLeft,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(5.0),
+                border: Border.all(
+                  color: Colors.blue,
+                  width: 0.5,
+                )
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(e.task,style: GoogleFonts.montserrat(),),
+                  Checkbox(
+                    key: GlobalKey(),
+                      value: _taskDone[list.indexOf(e)],
+                      onChanged: (newValue) {
+                        setState(() {
+                          _taskDone[list.indexOf(e)]=newValue;
+                        });
+                  })
+                ],
+              ),
+            );
+          }).toList(),
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         child: Icon(Icons.add,color: Colors.white,),
@@ -112,7 +197,7 @@ class _Example2State extends State<Example2> {
                         RaisedButton(
                             color: Colors.white,
                             textColor: Colors.blue,
-                            onPressed: () => _saveData,
+                            onPressed: () => _saveData(),
                             child : Text('Add',style: GoogleFonts.montserrat(),))
                       ],
                     )
